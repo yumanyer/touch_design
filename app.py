@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import sounddevice as sd
-import time
+import random
 
 # ================= CONFIG =================
 
@@ -9,17 +9,15 @@ CAMERA_INDEX = 0
 
 # Conjunto de caracteres solicitado por el usuario
 ASCII_CHARS = " .,:;irsXA253hMHGS#9B&@"
-FONT = cv2.FONT_HERSHEY_SIMPLEX  # Fuente estándar de OpenCV
+FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 # Rango de resolución (tamaño de celda)
-# Poco ruido -> caracteres grandes (MAX_CELL), imagen abstracta
-# Mucho ruido -> caracteres chicos (MIN_CELL), más densidad/detalle
-MIN_CELL = 6    
-MAX_CELL = 40   
+MIN_CELL = 5    # Mucho ruido -> detalle fino
+MAX_CELL = 50   # Silencio -> abstracción total
 
 # Sensibilidad y suavizado
-AUDIO_GAIN = 25.0
-AUDIO_SMOOTH = 0.85  # Suavizado para evitar saltos bruscos de resolución
+AUDIO_GAIN = 35.0
+AUDIO_SMOOTH = 0.80  # Un poco más rápido para captar beats
 
 # ==========================================
 
@@ -27,26 +25,35 @@ audio_level = 0.0
 
 def audio_callback(indata, frames, time_info, status):
     global audio_level
-    # Calcular RMS (Root Mean Square) para medir la energía del audio
     rms = np.sqrt(np.mean(indata**2))
     volume = rms * AUDIO_GAIN
-    # Aplicar suavizado exponencial
     audio_level = (AUDIO_SMOOTH * audio_level) + ((1 - AUDIO_SMOOTH) * volume)
 
-def get_cell_size(level):
+def get_params(level):
     """
-    Mapea el nivel de audio al tamaño de la celda.
-    Inverso: más nivel -> menor celda (más detalle).
+    Calcula parámetros visuales basados en el nivel de audio.
     """
     level = np.clip(level, 0.0, 1.0)
-    # Interpolar linealmente entre MAX y MIN
-    cell = MAX_CELL - (level * (MAX_CELL - MIN_CELL))
-    return int(cell)
+    
+    # Celda: Inversa al audio
+    cell = int(MAX_CELL - (level * (MAX_CELL - MIN_CELL)))
+    cell = max(cell, MIN_CELL)
+    
+    # Jitter: Desplazamiento aleatorio aumenta con el audio
+    jitter = int(level * (cell / 2.0))
+    
+    # Grosor: Aumenta con el audio
+    thickness = 1 if level < 0.4 else 2
+    if level > 0.8: thickness = 3
+    
+    # Escala de fuente: Proporcional a la celda pero con un boost en picos
+    font_scale = (cell / 20.0) * (0.8 + level * 0.5)
+    
+    return cell, jitter, thickness, font_scale
 
 def main():
     global audio_level
 
-    # ---- Configuración de Audio ----
     try:
         stream = sd.InputStream(
             channels=1,
@@ -58,78 +65,71 @@ def main():
         print(f"Error al iniciar audio: {e}")
         return
 
-    # ---- Configuración de Video ----
     cap = cv2.VideoCapture(CAMERA_INDEX)
     if not cap.isOpened():
         print("Error: No se pudo acceder a la cámara.")
         return
 
-    # Ventana en pantalla completa para inmersión
-    cv2.namedWindow("ASCII_SYSTEM", cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty("ASCII_SYSTEM", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+    cv2.namedWindow("SYSTEM_REACTION", cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty("SYSTEM_REACTION", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-    print("Sistema iniciado. Presiona 'ESC' para salir.")
+    print("Sistema reactivo mejorado. Presiona 'ESC' para salir.")
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Espejo para interacción natural
         frame = cv2.flip(frame, 1)
         h, w = frame.shape[:2]
 
-        # Procesamiento de imagen: Blanco y Negro puro
+        # Procesamiento de imagen agresivo
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # Normalizar y aumentar contraste para que el blanco sea "caracter" y negro "vacío"
-        gray = cv2.equalizeHist(gray)
         
-        # Determinar resolución basada en audio
-        cell = get_cell_size(audio_level)
-        cell = max(cell, MIN_CELL) # Asegurar mínimo
+        # Umbral dinámico basado en audio para "limpiar" el negro
+        threshold_val = 40 + int(audio_level * 40)
+        _, binary = cv2.threshold(gray, threshold_val, 255, cv2.THRESH_BINARY)
 
-        # Crear canvas negro absoluto
+        # Obtener parámetros dinámicos
+        cell, jitter_max, thickness, font_scale = get_params(audio_level)
+
+        # Canvas negro absoluto
         canvas = np.zeros((h, w), dtype=np.uint8)
 
-        # Escalar fuente proporcional al tamaño de celda
-        font_scale = cell / 22.0
-        thickness = 1 if cell < 15 else 2
-
-        # Iterar por la cuadrícula
+        # Iterar por la cuadrícula con un pequeño offset aleatorio (Jitter)
         for y in range(0, h, cell):
             for x in range(0, w, cell):
-                # Extraer bloque de la imagen original
-                block = gray[y:y+cell, x:x+cell]
-                if block.size == 0:
-                    continue
+                # Extraer bloque
+                block = binary[y:y+cell, x:x+cell]
+                if block.size == 0: continue
 
-                # El brillo promedio determina el carácter
-                avg_brightness = np.mean(block)
+                avg = np.mean(block)
                 
-                # Umbral: si es muy oscuro, es vacío (negro)
-                if avg_brightness > 40:
-                    # Mapear brillo a índice de ASCII_CHARS con mayor contraste
-                    normalized_brightness = np.clip((avg_brightness - 40) / (255 - 40), 0, 1)
-                    char_idx = int(normalized_brightness * (len(ASCII_CHARS) - 1))
+                # Solo dibujar si hay suficiente "luz"
+                if avg > 50:
+                    # Mapear brillo a carácter
+                    char_idx = int((avg / 255.0) * (len(ASCII_CHARS) - 1))
                     char = ASCII_CHARS[char_idx]
                     
-                    # Dibujar el carácter en el canvas
-                    # El blanco es el carácter, el fondo ya es negro
+                    # Aplicar Jitter a la posición
+                    jx = x + random.randint(-jitter_max, jitter_max) if jitter_max > 0 else x
+                    jy = y + cell + random.randint(-jitter_max, jitter_max) if jitter_max > 0 else y + cell
+                    
+                    # Dibujar carácter
                     cv2.putText(
                         canvas,
                         char,
-                        (x, y + cell - 2),
+                        (jx, jy),
                         FONT,
                         font_scale,
-                        255, # Blanco
+                        255,
                         thickness,
                         cv2.LINE_AA
                     )
 
-        # Mostrar el resultado
-        cv2.imshow("ASCII_SYSTEM", canvas)
+        # Mostrar resultado
+        cv2.imshow("SYSTEM_REACTION", canvas)
 
-        # Salida con ESC
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
