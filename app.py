@@ -6,19 +6,19 @@ import sounddevice as sd
 
 CAMERA_INDEX = 0
 
-# Conjunto de caracteres exacto solicitado
+# Conjunto de caracteres optimizado para densidad visual
 ASCII_CHARS = " .,:;irsXA253hMHGS#9B&@"
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 # Rango de resolución (tamaño de celda)
-# Poco ruido -> caracteres grandes (MAX_CELL), imagen abstracta
-# Mucho ruido -> caracteres chicos (MIN_CELL), más densidad/detalle
-MIN_CELL = 4    
-MAX_CELL = 60   
+# Poco ruido -> bloques masivos (MAX_CELL)
+# Mucho ruido -> textura fina y densa (MIN_CELL)
+MIN_CELL = 6    
+MAX_CELL = 50   
 
 # Sensibilidad y suavizado
-AUDIO_GAIN = 40.0
-AUDIO_SMOOTH = 0.7  # Menos suavizado para una reacción más nerviosa y directa
+AUDIO_GAIN = 45.0
+AUDIO_SMOOTH = 0.75 
 
 # ==========================================
 
@@ -49,8 +49,8 @@ def main():
         print("Error: No se pudo acceder a la cámara.")
         return
 
-    cv2.namedWindow("ASCII_SYSTEM", cv2.WINDOW_NORMAL)
-    cv2.setWindowProperty("ASCII_SYSTEM", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    cv2.namedWindow("ASCII_DENSE_SYSTEM", cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty("ASCII_DENSE_SYSTEM", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
     while True:
         ret, frame = cap.read()
@@ -60,12 +60,15 @@ def main():
         frame = cv2.flip(frame, 1)
         h, w = frame.shape[:2]
 
-        # Procesamiento de imagen para máximo contraste
+        # Procesamiento de imagen: Máximo contraste para silueta sólida
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         
-        # Ecualización adaptativa para asegurar que la silueta siempre sea visible
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        # Ecualización adaptativa fuerte para resaltar la figura
+        clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8,8))
         gray = clahe.apply(gray)
+        
+        # Aumentar brillo general para que los caracteres pesados dominen
+        gray = cv2.convertScaleAbs(gray, alpha=1.2, beta=10)
 
         # Determinar resolución basada en audio
         level = np.clip(audio_level, 0.0, 1.0)
@@ -75,12 +78,14 @@ def main():
         # Canvas negro absoluto
         canvas = np.zeros((h, w), dtype=np.uint8)
 
-        # Escala de fuente proporcional a la celda para que los caracteres se toquen
-        # Ajustado para que se vea denso como en la referencia
-        font_scale = cell / 18.0
-        thickness = 1 if cell < 12 else 2
+        # AJUSTE CRÍTICO: Escalado de fuente agresivo para llenar la celda
+        # Multiplicamos por un factor mayor para que los caracteres se encimen ligeramente
+        font_scale = (cell / 18.0) * 1.2 
+        
+        # Grosor forzado para evitar líneas delgadas
+        thickness = max(2, int(cell / 10))
 
-        # Iterar por la cuadrícula estática
+        # Iterar por la cuadrícula
         for y in range(0, h, cell):
             for x in range(0, w, cell):
                 block = gray[y:y+cell, x:x+cell]
@@ -88,17 +93,18 @@ def main():
 
                 avg = np.mean(block)
                 
-                # Umbral para que el negro sea vacío
+                # Umbral de visibilidad
                 if avg > 30:
                     # Mapear brillo a carácter
                     char_idx = int((avg / 255.0) * (len(ASCII_CHARS) - 1))
                     char = ASCII_CHARS[char_idx]
                     
-                    # Dibujar carácter en posición fija (rejilla)
+                    # Dibujar carácter centrado y expandido
+                    # El offset (y + cell - margin) asegura que llenen el espacio vertical
                     cv2.putText(
                         canvas,
                         char,
-                        (x, y + cell),
+                        (x - 2, y + cell - 2),
                         FONT,
                         font_scale,
                         255,
@@ -106,7 +112,7 @@ def main():
                         cv2.LINE_AA
                     )
 
-        cv2.imshow("ASCII_SYSTEM", canvas)
+        cv2.imshow("ASCII_DENSE_SYSTEM", canvas)
 
         if cv2.waitKey(1) & 0xFF == 27:
             break
