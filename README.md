@@ -1,42 +1,34 @@
-# Touch Design: Audio-Reactive ASCII System
+# Touch Design Interactivo con Python
 
-Este sistema transforma la entrada de video en una representación puramente de caracteres ASCII, donde la **resolución visual es controlada dinámicamente por el audio**.
+Este programa es una aplicación de diseño interactivo que utiliza la cámara para detectar manos y reacciona al ritmo de la música cargada.
 
-## Concepto
-- ❌ **Sin video "normal"**: La imagen existe solo como una matriz de caracteres.
-- ✅ **ASCII Puro**: El blanco son caracteres, el negro es vacío absoluto.
-- 🎵 **Audio como Control de Resolución**:
-  - **Poco ruido**: Caracteres grandes, imagen abstracta y pobre en detalle.
-  - **Mucho ruido**: Caracteres pequeños, alta densidad y máximo detalle.
-- 🧠 **Reactividad Orgánica**: El sistema no decora, reacciona. El sonido es la fuente de la información visual.
+## Características
+- **Seguimiento de Manos**: Utiliza MediaPipe para detectar la posición de tus manos.
+- **Audio Reactivo**: Analiza frecuencias (FFT) y amplitud en tiempo real para generar visuales.
+- **Partículas Interactivas**: Las partículas son atraídas por tus manos y cambian de color/tamaño según la música.
+- **Compatible con Iriun Webcam**: Configurado para detectar dispositivos de video en Linux.
 
-## Requisitos
-- Python 3.x
-- OpenCV (`opencv-python`)
-- NumPy
-- SoundDevice
-- PortAudio (Librería del sistema)
-
-## Instalación
+## Requisitos del Sistema (Linux)
+Asegúrate de tener instaladas las dependencias del sistema:
 ```bash
-# Instalar dependencias de Python
-pip install opencv-python numpy sounddevice
-
-# En Linux (Ubuntu/Debian), instalar PortAudio
-sudo apt-get install libportaudio2
+sudo apt-get update
+sudo apt-get install -y portaudio19-dev ffmpeg python3.11-dev gcc g++
 ```
 
-## Uso
-Ejecuta el script principal:
+## Instalación de Librerías Python
 ```bash
-python app.py
+pip install mediapipe opencv-python pygame pyaudio numpy scipy pydub
 ```
-- **ESC**: Salir del sistema.
-- El sistema se iniciará en modo ventana (ajustable a pantalla completa en el código).
 
-## Configuración (app.py)
-Puedes ajustar los siguientes parámetros en la sección `CONFIG`:
-- `MIN_CELL`: Tamaño mínimo de celda (máximo detalle con ruido fuerte).
-- `MAX_CELL`: Tamaño máximo de celda (mínimo detalle en silencio).
-- `AUDIO_GAIN`: Sensibilidad del micrófono.
-- `AUDIO_SMOOTH`: Suavizado de la transición de resolución.
+## Cómo usar
+1. Coloca un archivo de audio llamado `audio.mp3` en la misma carpeta que el script (o cambia el nombre en `main.py`).
+2. Conecta tu celular con **Iriun Webcam** y asegúrate de que Linux lo reconozca (usualmente como `/dev/video0` o `/dev/video1`).
+3. Ejecuta el programa:
+   ```bash
+   python main.py
+   ```
+
+## Controles
+- **Mover las manos**: Las partículas seguirán la punta de tu dedo índice.
+- **Música**: Los visuales del fondo y el comportamiento de las partículas cambiarán con el ritmo.
+- **ESC**: Salir del programa.
