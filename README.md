@@ -21,12 +21,24 @@ pip install mediapipe opencv-python pygame pyaudio numpy scipy pydub
 ```
 
 ## Cómo usar
-1. Coloca un archivo de audio llamado `audio.mp3` en la misma carpeta que el script (o cambia el nombre en `main.py`).
-2. Conecta tu celular con **Iriun Webcam** y asegúrate de que Linux lo reconozca (usualmente como `/dev/video0` o `/dev/video1`).
-3. Ejecuta el programa:
+1. Coloca un archivo de audio llamado `audio.mp3` en la misma carpeta que el script.
+2. Conecta tu celular con **Iriun Webcam**.
+3. Ejecuta la versión estándar:
    ```bash
    python main.py
    ```
+4. **¡NUEVO!** Ejecuta la versión **Psicodélica**:
+   ```bash
+   python main_psychedelic.py
+   ```
+
+## Versión Psicodélica (Psychedelic Mode)
+Esta versión incluye:
+- **Efecto Túnel/Feedback**: Los visuales se repiten y escalan creando un efecto de viaje infinito.
+- **Mandalas Reactivos**: Geometría sagrada que rota y cambia de tamaño con los bajos.
+- **Simetría de Espejo**: Todo lo que hagas con una mano se refleja psicodélicamente.
+- **Efecto Glitch**: Distorsiones visuales cuando la música llega a su punto máximo.
+- **Colores HSV**: Transiciones de color neón fluidas.
 
 ## Controles
 - **Mover las manos**: Las partículas seguirán la punta de tu dedo índice.
